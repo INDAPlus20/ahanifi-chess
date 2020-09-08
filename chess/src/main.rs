@@ -1,7 +1,7 @@
 use chess::board;
-use std::fs;
 
 fn main() {
     let path = "board_config.txt";
-    let brada = board::new(path);
+    let my_board = board::new(path);
+    println!("{}", my_board)
 }
