@@ -4,6 +4,7 @@ pub mod units {
         pub rank: Ranks,
         pub color: Color,
         pub offset: [[i8; 2]; 8],
+        pub sliding: bool,
     }
     #[derive(Debug, PartialEq, Copy, Clone)]
     pub enum Ranks {
@@ -23,157 +24,196 @@ pub mod units {
         Black,
     }
 
-    pub fn piece_constructor(rank: Ranks, color: Color) -> Piece {
-        let piece = match rank {
-            Ranks::King => Piece {
-                rank: rank,
-                color: color,
-                offset: [
-                    [-1, 0],
-                    [-1, 1],
-                    [0, 1],
-                    [1, 1],
-                    [1, 0],
-                    [1, -1],
-                    [0, -1],
-                    [1, -1],
-                ],
-            },
-            Ranks::Queen => Piece {
-                rank: rank,
-                color: color,
-                offset: [
-                    [-1, 0],
-                    [-1, 1],
-                    [0, 1],
-                    [1, 1],
-                    [1, 0],
-                    [1, -1],
-                    [0, -1],
-                    [1, -1],
-                ],
-            },
-            Ranks::Bishop => Piece {
-                rank: rank,
-                color: color,
-                offset: [
-                    [-1, 1],
-                    [1, 1],
-                    [1, -1],
-                    [1, -1],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                ],
-            },
-            Ranks::Rook => Piece {
-                rank: rank,
-                color: color,
-                offset: [
-                    [-1, 0],
-                    [0, 1],
-                    [1, 0],
-                    [0, -1],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                ],
-            },
-            Ranks::Knight => Piece {
-                rank: rank,
-                color: color,
-                offset: [
-                    [-2, 1],
-                    [-1, 2],
-                    [1, 2],
-                    [2, 1],
-                    [2, -1],
-                    [1, -2],
-                    [-1, -2],
-                    [-2, -1],
-                ],
-            },
-            Ranks::Pawn => Piece {
-                rank: rank,
-                color: color,
-                offset: [
-                    [0, 1],
-                    [-1, 1],
-                    [1, 1],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                ],
-            },
-            Ranks::Empty => Piece {
-                rank: rank,
-                color: color,
-                offset: [
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                ],
-            },
-            _ => panic!("cant construct piece"),
-        };
-        piece
+    impl Piece {
+        pub fn piece_constructor(rank: Ranks, color: Color) -> Piece {
+            let piece = match rank {
+                Ranks::King => Piece {
+                    rank: rank,
+                    color: color,
+                    offset: [
+                        [-1, 0],
+                        [-1, 1],
+                        [0, 1],
+                        [1, 1],
+                        [1, 0],
+                        [1, -1],
+                        [0, -1],
+                        [1, -1],
+                    ],
+                    sliding: false,
+                },
+                Ranks::Queen => Piece {
+                    rank: rank,
+                    color: color,
+                    offset: [
+                        [-1, 0],
+                        [-1, 1],
+                        [0, 1],
+                        [1, 1],
+                        [1, 0],
+                        [1, -1],
+                        [0, -1],
+                        [1, -1],
+                    ],
+                    sliding: true,
+                },
+                Ranks::Bishop => Piece {
+                    rank: rank,
+                    color: color,
+                    offset: [
+                        [-1, 1],
+                        [1, 1],
+                        [1, -1],
+                        [1, -1],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                    ],
+                    sliding: true,
+                },
+                Ranks::Rook => Piece {
+                    rank: rank,
+                    color: color,
+                    offset: [
+                        [-1, 0],
+                        [0, 1],
+                        [1, 0],
+                        [0, -1],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                    ],
+                    sliding: true,
+                },
+                Ranks::Knight => Piece {
+                    rank: rank,
+                    color: color,
+                    offset: [
+                        [-2, 1],
+                        [-1, 2],
+                        [1, 2],
+                        [2, 1],
+                        [2, -1],
+                        [1, -2],
+                        [-1, -2],
+                        [-2, -1],
+                    ],
+                    sliding: false,
+                },
+                Ranks::Pawn => Piece {
+                    rank: rank,
+                    color: color,
+                    offset: [
+                        [0, 1],
+                        [-1, 1],
+                        [1, 1],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                    ],
+                    sliding: false,
+                },
+                Ranks::Empty => Piece {
+                    rank: rank,
+                    color: color,
+                    offset: [
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                        [0, 0],
+                    ],
+                    sliding: false,
+                },
+            };
+            piece
+        }
     }
 }
 
-pub mod position {
+pub mod actions {
     use super::board;
     use super::units;
-    pub fn psuedo_legal_moves(from_sq: board::Square, board: board::Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = vec![];
-        let piece_on_sq = from_sq.piece;
+
+    pub enum Actions {
+        Move,
+    }
+
+    
+    pub fn psuedo_legal_moves(from:(i8,i8), board: board::Board) -> Vec<(i8,i8)> {
+        let mut moves: Vec<(i8,i8)> = vec![];
+        let piece_on_sq = board.matrix[from.0 as usize][from.1 as usize].piece;
         if piece_on_sq.rank == units::Ranks::Empty {
             return moves;
         }
         let offset = &piece_on_sq.offset;
-        let current_pos = &from_sq.coordinate;
+        let current_pos = &from;
 
         for vector in offset {
-            let new_x_value = (current_pos.1 + &vector[0]) as usize;
-            let new_y_value = (current_pos.0 + &vector[1]) as usize;
-            println!("{:?}", vector);
-            if new_x_value < 0 || new_x_value > 7 {
-                continue;
+            if vector[0]==0 && vector[1]==0{
+                break;
             }
-            if new_y_value < 0 || new_y_value > 7 {
-                continue;
-            }
-            let to_sq = board.matrix[new_y_value][new_x_value];
+                loop {
+                    let new_x_value = (current_pos.0 + &vector[0]);
+                    let new_y_value = (current_pos.1+ &vector[1]);
+                    println!("{:?}", vector);
+                    if new_x_value < 0 || new_x_value > 7 {
+                        break;
+                    }
+                    if new_y_value < 0 || new_y_value > 7 {
+                        break;
+                    }
+                    let to_sq = board.matrix[new_y_value as usize][new_x_value as usize];
 
-            if to_sq.piece.color == from_sq.piece.color {
-                continue;
-            }
-            let current_move = Move {
-                from_sq: from_sq,
-                to_sq: to_sq,
-            };
-            moves.push(current_move);
+                    if to_sq.piece.color == piece_on_sq.color {
+                        break;
+                    }
+                   
+                    moves.push((new_x_value,new_y_value));
+                    let current_pos= &to_sq.coordinate;
+                    if !piece_on_sq.sliding{
+                        break;
+                    }
+                }    
         }
+
+         
+        
         moves
     }
+
+    pub fn move_coordinate(from:(i8,i8),to:(i8,i8),board:board::Board) -> Result<Move, () >{
+       if  psuedo_legal_moves(from,board).contains(&to){
+           let current_move =Move{
+                from_sq:from,
+                to_sq:to,
+           };
+        return Ok(current_move);
+       }
+       Err(())
+       
+    }
+    pub fn validate_moves() {}
     #[derive(Debug)]
     pub struct Move {
-        pub from_sq: board::Square,
-        pub to_sq: board::Square,
+        pub from_sq: (i8,i8),
+        pub to_sq: (i8,i8)
     }
+    
+
 }
 
 pub mod board {
     use super::load_from_file;
     use super::units;
+    use super::actions;
     use std::fmt;
 
     #[derive(Debug, Copy, Clone)]
@@ -204,6 +244,9 @@ pub mod board {
     pub struct Board {
         pub matrix: [[Square; 8]; 8],
     }
+
+
+
     impl fmt::Display for Board {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             let mut formatted_string = String::new();
@@ -240,24 +283,16 @@ pub mod board {
 
     pub fn create_empty_square() -> Square {
         let empty_square = Square {
-            piece: units::Piece {
-                rank: units::Ranks::King,
-                color: units::Color::Empty,
-                offset: [
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                ],
-            },
+            piece: units::Piece::piece_constructor(units::Ranks::Empty, units::Color::Empty),
             coordinate: (0, 0),
         };
         empty_square
     }
+
+    
+
+   
+
 }
 
 mod load_from_file {
@@ -278,9 +313,9 @@ mod load_from_file {
 
         for (i, line) in split_data.iter().enumerate() {
             for (j, pair) in line.iter().enumerate() {
-                matrix[7 - i][j] = board::Square {
+                matrix[j][7-i] = board::Square {
                     piece: map_letter_to_piece(pair),
-                    coordinate: (7 - i as i8, j as i8),
+                    coordinate: (j as i8, 7-i as i8),
                 }
             }
         }
@@ -320,14 +355,50 @@ mod load_from_file {
             rank = units::Ranks::Empty;
         }
 
-        units::piece_constructor(rank, color)
+        units::Piece::piece_constructor(rank, color)
+    }
+}
+
+mod game {
+    use super::board;
+    use super::actions;
+    use super::units;
+
+    struct Player{
+        killed: Vec<units::Piece>,
+    }
+
+    
+    pub struct Game {
+        board: board::Board,
+        players: [Player;2],
+    }
+
+    impl Game {
+        fn new() {}
+        fn replace(piece_move:actions::Move){
+
+        }
+        fn move_coordinate(&self,from:(i8,i8), to:(i8,i8)){
+            actions::move_coordinate(from, to,self.board);
+        }
+
+        fn perform_action(&self,action:actions::Actions){
+            match action {
+                actions::Actions::Move => {
+                     replace()
+                },
+                _ => panic!("No such move"),
+            }
+        }
+        
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::board;
-    use super::position;
+    use super::actions;
     use super::units;
 
     #[test]
@@ -352,9 +423,9 @@ mod tests {
     fn test_pawn_movement() {
         let path = "board_config.txt";
         let board = board::new(path);
-        let moves = position::psuedo_legal_moves(board.matrix[1][4], board);
+        let moves = actions::psuedo_legal_moves((4,1), board);
 
-        assert!(moves[0].to_sq.coordinate == (2, 4));
+        assert!(moves[0] == (4, 2));
     }
     #[test]
     fn test_bottom_color() {
@@ -367,8 +438,11 @@ mod tests {
     fn test_same_color_collision() {
         let path = "board_config.txt";
         let board = board::new(path);
-        let moves = position::psuedo_legal_moves(board.matrix[0][3], board);
+        let moves = actions::psuedo_legal_moves((3,0), board);
 
         assert_eq!(moves.len(), 0);
     }
+
+
+    
 }
