@@ -1,448 +1,654 @@
-pub mod units {
-    #[derive(Debug, Copy, Clone)]
-    pub struct Piece {
-        pub rank: Ranks,
-        pub color: Color,
-        pub offset: [[i8; 2]; 8],
-        pub sliding: bool,
-    }
-    #[derive(Debug, PartialEq, Copy, Clone)]
-    pub enum Ranks {
-        Empty,
-        Pawn,
-        Rook,
-        Knight,
-        Bishop,
-        Queen,
-        King,
-    }
+#![allow(dead_code)]
+#![allow(dead_code)]
 
-    #[derive(Debug, PartialEq, Copy, Clone)]
-    pub enum Color {
-        Empty,
-        White,
-        Black,
-    }
+use std;
 
-    impl Piece {
-        pub fn piece_constructor(rank: Ranks, color: Color) -> Piece {
-            let piece = match rank {
-                Ranks::King => Piece {
-                    rank: rank,
-                    color: color,
-                    offset: [
-                        [-1, 0],
-                        [-1, 1],
-                        [0, 1],
-                        [1, 1],
-                        [1, 0],
-                        [1, -1],
-                        [0, -1],
-                        [1, -1],
-                    ],
-                    sliding: false,
-                },
-                Ranks::Queen => Piece {
-                    rank: rank,
-                    color: color,
-                    offset: [
-                        [-1, 0],
-                        [-1, 1],
-                        [0, 1],
-                        [1, 1],
-                        [1, 0],
-                        [1, -1],
-                        [0, -1],
-                        [1, -1],
-                    ],
-                    sliding: true,
-                },
-                Ranks::Bishop => Piece {
-                    rank: rank,
-                    color: color,
-                    offset: [
-                        [-1, 1],
-                        [1, 1],
-                        [1, -1],
-                        [1, -1],
-                        [0, 0],
-                        [0, 0],
-                        [0, 0],
-                        [0, 0],
-                    ],
-                    sliding: true,
-                },
-                Ranks::Rook => Piece {
-                    rank: rank,
-                    color: color,
-                    offset: [
-                        [-1, 0],
-                        [0, 1],
-                        [1, 0],
-                        [0, -1],
-                        [0, 0],
-                        [0, 0],
-                        [0, 0],
-                        [0, 0],
-                    ],
-                    sliding: true,
-                },
-                Ranks::Knight => Piece {
-                    rank: rank,
-                    color: color,
-                    offset: [
-                        [-2, 1],
-                        [-1, 2],
-                        [1, 2],
-                        [2, 1],
-                        [2, -1],
-                        [1, -2],
-                        [-1, -2],
-                        [-2, -1],
-                    ],
-                    sliding: false,
-                },
-                Ranks::Pawn => Piece {
-                    rank: rank,
-                    color: color,
-                    offset: [
-                        [0, 1],
-                        [-1, 1],
-                        [1, 1],
-                        [0, 0],
-                        [0, 0],
-                        [0, 0],
-                        [0, 0],
-                        [0, 0],
-                    ],
-                    sliding: false,
-                },
-                Ranks::Empty => Piece {
-                    rank: rank,
-                    color: color,
-                    offset: [
-                        [0, 0],
-                        [0, 0],
-                        [0, 0],
-                        [0, 0],
-                        [0, 0],
-                        [0, 0],
-                        [0, 0],
-                        [0, 0],
-                    ],
-                    sliding: false,
-                },
-            };
-            piece
-        }
-    }
+use std::fmt;
+
+pub struct Game {
+    pub matrix: [[Square; 8]; 8],
+    player: Team,
+    history: Vec<Action>,
 }
 
-pub mod actions {
-    use super::board;
-    use super::units;
-
-    pub enum Actions {
-        Move,
-    }
-
-    
-    pub fn psuedo_legal_moves(from:(i8,i8), board: board::Board) -> Vec<(i8,i8)> {
-        let mut moves: Vec<(i8,i8)> = vec![];
-        let piece_on_sq = board.matrix[from.0 as usize][from.1 as usize].piece;
-        if piece_on_sq.rank == units::Ranks::Empty {
-            return moves;
-        }
-        let offset = &piece_on_sq.offset;
-        let current_pos = &from;
-
-        for vector in offset {
-            if vector[0]==0 && vector[1]==0{
-                break;
-            }
-                loop {
-                    let new_x_value = (current_pos.0 + &vector[0]);
-                    let new_y_value = (current_pos.1+ &vector[1]);
-                    println!("{:?}", vector);
-                    if new_x_value < 0 || new_x_value > 7 {
-                        break;
-                    }
-                    if new_y_value < 0 || new_y_value > 7 {
-                        break;
-                    }
-                    let to_sq = board.matrix[new_y_value as usize][new_x_value as usize];
-
-                    if to_sq.piece.color == piece_on_sq.color {
-                        break;
-                    }
-                   
-                    moves.push((new_x_value,new_y_value));
-                    let current_pos= &to_sq.coordinate;
-                    if !piece_on_sq.sliding{
-                        break;
-                    }
-                }    
-        }
-
-         
-        
-        moves
-    }
-
-    pub fn move_coordinate(from:(i8,i8),to:(i8,i8),board:board::Board) -> Result<Move, () >{
-       if  psuedo_legal_moves(from,board).contains(&to){
-           let current_move =Move{
-                from_sq:from,
-                to_sq:to,
-           };
-        return Ok(current_move);
-       }
-       Err(())
-       
-    }
-    pub fn validate_moves() {}
-    #[derive(Debug)]
-    pub struct Move {
-        pub from_sq: (i8,i8),
-        pub to_sq: (i8,i8)
-    }
-    
-
-}
-
-pub mod board {
-    use super::load_from_file;
-    use super::units;
-    use super::actions;
-    use std::fmt;
-
-    #[derive(Debug, Copy, Clone)]
-    pub struct Square {
-        pub piece: units::Piece,
-        pub coordinate: (i8, i8),
-    }
-
-    impl Square {
-        fn is_empty(&self) -> bool {
-            if let units::Ranks::Empty = self.piece.rank {
-                return true;
-            }
-            false
-        }
-    }
-
-    impl fmt::Display for Square {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            if self.is_empty() {
-                return write!(f, ".");
-            }
-
-            write!(f, "{}", self.piece.rank as i32)
-        }
-    }
-    #[derive(Debug, Copy, Clone)]
-    pub struct Board {
-        pub matrix: [[Square; 8]; 8],
-    }
-
-
-
-    impl fmt::Display for Board {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            let mut formatted_string = String::new();
-            for x in self.matrix.iter() {
-                for y in x {
-                    formatted_string.push_str(&String::from(format!("{} ", y)));
-                }
-                formatted_string.push_str(&String::from(format!("\n")));
-            }
-            write!(f, "{}", formatted_string)
-        }
-    }
-
-    fn index_to_rank(index: usize) -> units::Ranks {
-        match index {
-            index if index == units::Ranks::Empty as usize => units::Ranks::Empty,
-            index if index == units::Ranks::Pawn as usize => units::Ranks::Pawn,
-            index if index == units::Ranks::Rook as usize => units::Ranks::Rook,
-            index if index == units::Ranks::Knight as usize => units::Ranks::Knight,
-            index if index == units::Ranks::Bishop as usize => units::Ranks::Bishop,
-            index if index == units::Ranks::Queen as usize => units::Ranks::Queen,
-            index if index == units::Ranks::King as usize => units::Ranks::King,
-            _ => panic!("There is no Rank"),
-        }
-    }
-
-    pub fn new(config_file: &str) -> Board {
-        let board = Board {
-            matrix: load_from_file::load_from_pgn(config_file),
-        };
-
-        board
-    }
-
-    pub fn create_empty_square() -> Square {
-        let empty_square = Square {
-            piece: units::Piece::piece_constructor(units::Ranks::Empty, units::Color::Empty),
-            coordinate: (0, 0),
-        };
-        empty_square
-    }
-
-    
-
-   
-
-}
-
-mod load_from_file {
-    use super::board;
-    use super::units;
-    use std::fs;
-
-    pub fn load_from_pgn(path: &str) -> [[board::Square; 8]; 8] {
-        let data = fs::read_to_string(path).expect("Failed to read file");
-        let split_data: Vec<Vec<&str>> = data
-            .lines()
-            .map(|line| line.split_whitespace().collect())
+impl Game {
+    pub fn new() -> Game {
+        let init_state: Vec<&str> = ("RB NB BB KB QB BB NB RB
+            PB PB PB PB PB PB PB PB
+            XX XX XX XX XX XX XX XX
+            XX XX XX XX XX XX XX XX
+            XX XX XX XX XX XX XX XX
+            XX XX XX XX XX XX XX XX
+            PW PW PW PW PW PW PW PW
+            RW NW BW KW QW BW NW RW")
+            .trim()
+            .split_whitespace()
+            .rev()
             .collect();
 
-        let empty_square = board::create_empty_square();
+        let placeholder_square = Square {
+            //TODO fix array initialization
+            piece: None,
+            coordinate: (-1, -1),
+        };
+        let mut empty_matrix: [[Square; 8]; 8] = [[placeholder_square; 8]; 8];
+        let mut pieces: Vec<Option<Piece>> = vec![];
 
-        let mut matrix: [[board::Square; 8]; 8] = [[empty_square; 8]; 8];
+        for block in init_state {
+            let piece = Game::block_to_piece(block);
+            pieces.push(piece);
+        }
+        let mut counter = 0;
+        for row in 0..8 {
+            for column in 0..8 {
+                let square: Square = Square {
+                    piece: pieces[counter as usize],
+                    coordinate: (column, row),
+                };
 
-        for (i, line) in split_data.iter().enumerate() {
-            for (j, pair) in line.iter().enumerate() {
-                matrix[j][7-i] = board::Square {
-                    piece: map_letter_to_piece(pair),
-                    coordinate: (j as i8, 7-i as i8),
+                empty_matrix[column as usize][row as usize] = square;
+                counter += 1;
+            }
+        }
+        Game {
+            history: vec![],
+            player: Team::White,
+            matrix: empty_matrix,
+        }
+    }
+    pub fn perform_action(&mut self, action: Action) {
+        self.history.push(action);
+
+        let coordinate_from = action.from.coordinate;
+        let coordinate_to = action.to.coordinate;
+        let moving_piece =
+            self.matrix[coordinate_from.0 as usize][coordinate_from.1 as usize].piece;
+        let team_offset = match self.player {
+            Team::White => 1,
+            Team::Black => -1,
+        };
+        match action.action_type {
+            ActionType::Regular => {
+                self.matrix[coordinate_to.0 as usize][coordinate_to.1 as usize].piece =
+                    moving_piece;
+                self.matrix[coordinate_from.0 as usize][coordinate_from.1 as usize].piece = None;
+            }
+            ActionType::Enpassant => {
+                self.matrix[coordinate_to.0 as usize][coordinate_to.1 as usize].piece =
+                    moving_piece;
+                self.matrix[coordinate_from.0 as usize][coordinate_from.1 as usize].piece = None;
+                self.matrix[coordinate_to.0 as usize][(coordinate_to.1 - team_offset) as usize]
+                    .piece = None;
+            }
+            _ => panic!("not implemented castling and promotion"),
+        }
+
+        self.player = next_player(self.player)
+    }
+
+    fn block_to_piece(block: &str) -> Option<Piece> {
+        let rank_letter = block.chars().nth(0).expect("not a pair");
+        let team_letter = block.chars().nth(1).expect("not a pair");
+
+        if block == "XX" {
+            return None;
+        }
+        let rank = match rank_letter {
+            'P' => Rank::Pawn,
+            'R' => Rank::Rook,
+            'N' => Rank::Knight,
+            'B' => Rank::Bishop,
+            'Q' => Rank::Queen,
+            'K' => Rank::King,
+            _ => panic!("Piece letter not valid"),
+        };
+        let team = match team_letter {
+            'W' => Team::White,
+            'B' => Team::Black,
+            _ => panic!("Team letter not valid"),
+        };
+
+        let piece = Piece {
+            rank: rank,
+            team: team,
+        };
+
+        Some(piece)
+    }
+
+    pub fn move_from_string(&self, letter_coordinate: &str) -> Result<Vec<Action>, String> {
+        let square = match self.square_from_string(letter_coordinate) {
+            Ok(s) => s,
+            Err(s) => return Err(s),
+        };
+        let moveset = match self.generate_moves(square) {
+            Ok(a) => a,
+            Err(s) => return Err(s),
+        };
+
+        let mut index = 0;
+        for action in &moveset {
+            let letter_coordinate = Game::coordinate_to_string(action.to.coordinate);
+            println!("{}. {}", index, letter_coordinate);
+            index += 1;
+        }
+        Ok(moveset)
+    }
+
+    pub fn move_string(&mut self, letter_coordinate_from: &str, letter_coordinate_to: &str) {
+        let square = self.square_from_string(letter_coordinate_from).unwrap();
+        let coordinate_from = square.coordinate;
+        let moveset = self.generate_moves(square).unwrap();
+        let coordinate_to = Game::coordinate_from_string(letter_coordinate_to).unwrap();
+        if moveset.len() > 0 {
+            for action in moveset {
+                println!("{}", Game::square_to_string(&self, action.to));
+                if action.to.coordinate == coordinate_to {
+                    self.matrix[coordinate_to.0 as usize][coordinate_to.1 as usize].piece =
+                        square.piece;
+                    self.matrix[coordinate_from.0 as usize][coordinate_from.1 as usize].piece =
+                        None;
+                    self.history.push(action);
+                } else {
+                    println!("cant move there")
+                }
+            }
+        } else {
+            println!("no moves for this piece")
+        }
+    }
+
+    fn generate_moves(&self, square: Square) -> Result<Vec<Action>, String> {
+        let rank = match square.piece {
+            Some(p) => p.rank,
+            None => return Err(String::from("Tried to move empty square")),
+        };
+        let team = square.piece.unwrap().team;
+        if team != self.player {
+            return Err(String::from("Cant move enemy piece"));
+        };
+
+        let moveset: Vec<Action> = match rank {
+            Rank::Pawn => self.gen_moveset_pawn(square),
+            Rank::Rook => self.gen_moveset_rook(square),
+            Rank::Knight => self.gen_moveset_knight(square),
+            Rank::Bishop => self.gen_moveset_bishop(square),
+            Rank::Queen => self.gen_moveset_queen(square),
+            Rank::King => self.gen_moveset_king(square),
+        };
+        Ok(moveset)
+    }
+
+    fn gen_moveset_pawn(&self, start_square: Square) -> Vec<Action> {
+        let mut available_moves = Vec::<Action>::new();
+        //let coordinate:(usize,usize)=(square.coordinate.0.try_into().unwrap(),square.coordinate.1.try_into().unwrap());
+        let coordinate = start_square.coordinate;
+        let x = coordinate.0;
+        let y = coordinate.1;
+
+        let offset = match self.player {
+            Team::White => 1,
+            Team::Black => -1,
+        };
+        let new_coordinate_x = x;
+        let new_coordinate_y = y + offset;
+        let new_square = self.matrix[new_coordinate_x as usize][new_coordinate_y as usize];
+        if new_square.piece.is_none() {
+            let action = Action {
+                from: start_square,
+                to: new_square,
+                action_type: ActionType::Regular,
+            };
+            available_moves.push(action);
+        }
+
+        let new_coordinate_x = x + 1;
+        if not_out_of_bounds(new_coordinate_x, new_coordinate_y) {
+            let new_square = self.matrix[new_coordinate_x as usize][new_coordinate_y as usize];
+            if not_same_team(self.player, new_square) {
+                let action = Action {
+                    from: start_square,
+                    to: new_square,
+                    action_type: ActionType::Regular,
+                };
+                available_moves.push(action);
+            }
+        }
+
+        let new_coordinate_x = x - 1;
+        if not_out_of_bounds(new_coordinate_x, new_coordinate_y) {
+            let new_square = self.matrix[new_coordinate_x as usize][new_coordinate_y as usize];
+            if not_same_team(self.player, new_square) {
+                let action = Action {
+                    from: start_square,
+                    to: new_square,
+                    action_type: ActionType::Regular,
+                };
+                available_moves.push(action);
+            }
+        }
+
+        if is_starting_position(start_square) {
+            let new_coordinate_y = y + 2 * offset;
+            if not_out_of_bounds(x, new_coordinate_y) {
+                let new_square = self.matrix[x as usize][new_coordinate_y as usize];
+                if new_square.piece.is_none() {
+                    let action = Action {
+                        from: start_square,
+                        to: new_square,
+                        action_type: ActionType::Regular,
+                    };
+                    available_moves.push(action);
                 }
             }
         }
-        return matrix;
+        //TODO fix enpassant, starting position
+
+        let mut prev_action: &Action;
+
+        //Enpassant
+        for dx in (-1..2).step_by(2) {
+            if not_out_of_bounds(x + dx, y) {
+                let side_square = self.matrix[(x + dx) as usize][y as usize];
+                if not_same_team(self.player, side_square) {
+                    if side_square.piece.unwrap().rank == Rank::Pawn {
+                        prev_action = self.history.last().unwrap();
+                        let enemy_start_y = prev_action.from.coordinate.1;
+                        let dy = (y - enemy_start_y).abs();
+                        println!("{}", dy);
+                        if dy == 2 {
+                            let action = Action {
+                                from: start_square,
+                                to: self.matrix[(x + dx) as usize][(y + offset) as usize],
+                                action_type: ActionType::Enpassant,
+                            };
+                            available_moves.push(action);
+                        }
+                    }
+                }
+            }
+        }
+
+        available_moves
     }
 
-    fn map_letter_to_piece(letter_pair: &str) -> units::Piece {
-        let rank_letter = letter_pair.chars().nth(0).expect("not a pair");
-        let color_letter = letter_pair.chars().nth(1).expect("not a pair");
+    fn gen_moveset_rook(&self, start_square: Square) -> Vec<Action> {
+        let max_one = false;
+        let can_jump = false;
+        let gen_moveset = self.straight_move(start_square, max_one, can_jump);
+        gen_moveset
+    }
 
-        let color: units::Color;
-        let rank: units::Ranks;
-        let offset: [u8; 8];
-        if color_letter == 'B' {
-            color = units::Color::Black;
-        } else if color_letter == 'W' {
-            color = units::Color::White;
-        } else {
-            color = units::Color::Empty;
+    fn gen_moveset_bishop(&self, start_square: Square) -> Vec<Action> {
+        let max_one = false;
+        let can_jump = false;
+        let gen_moveset = self.diagonal_move(start_square, max_one, can_jump);
+        gen_moveset
+    }
+
+    fn gen_moveset_queen(&self, start_square: Square) -> Vec<Action> {
+        let max_one = false;
+        let can_jump = false;
+        let mut gen_moveset = self.diagonal_move(start_square, max_one, can_jump);
+        gen_moveset.append(&mut self.straight_move(start_square, max_one, can_jump));
+        gen_moveset
+    }
+
+    fn gen_moveset_king(&self, start_square: Square) -> Vec<Action> {
+        let max_one = true;
+        let can_jump = false;
+        let mut gen_moveset = self.diagonal_move(start_square, max_one, can_jump);
+        gen_moveset.append(&mut self.straight_move(start_square, max_one, can_jump));
+        gen_moveset
+    }
+
+    fn gen_moveset_knight(&self, start_square: Square) -> Vec<Action> {
+        let max_one = true;
+        let can_jump = true;
+        let offsets = vec![(-2, 1), (-1, 2), (1, 2), (2, 1), (2, -1), (1, -2), (-1, -2)];
+        let gen_moveset = self.gen_generic_moveset(start_square, offsets, max_one, can_jump);
+        gen_moveset
+    }
+
+    fn diagonal_move(&self, start_square: Square, max_one: bool, can_jump: bool) -> Vec<Action> {
+        let offsets = vec![(-1, 1), (-1, -1), (1, 1), (1, -1)];
+        let gen_moveset: Vec<Action> =
+            self.gen_generic_moveset(start_square, offsets, max_one, can_jump);
+        gen_moveset
+    }
+
+    fn straight_move(&self, start_square: Square, max_one: bool, can_jump: bool) -> Vec<Action> {
+        let offsets = vec![(-1, 0), (0, 1), (1, 0), (0, -1)];
+        let gen_moveset: Vec<Action> =
+            self.gen_generic_moveset(start_square, offsets, max_one, can_jump);
+        gen_moveset
+    }
+
+    fn gen_generic_moveset(
+        &self,
+        start_square: Square,
+        offsets: Vec<(isize, isize)>,
+        max_one: bool,
+        can_jump: bool,
+    ) -> Vec<Action> {
+        let start_coordinate = start_square.coordinate;
+        let start_x = start_coordinate.0;
+        let start_y = start_coordinate.1;
+        let mut gen_moveset: Vec<Action> = vec![];
+        let offsets = offsets;
+        for offset in offsets.iter() {
+            let mut step = 1;
+            loop {
+                let new_x = start_x + offset.0 * step;
+                let new_y = start_y + offset.1 * step;
+
+                let mut psuedo_valid_moveset = self.psuedo_vaild_move(start_square, new_x, new_y);
+
+                gen_moveset.append(&mut psuedo_valid_moveset.0);
+
+                if psuedo_valid_moveset.1 == true && !can_jump {
+                    break;
+                }
+                step += 1;
+                if max_one {
+                    break;
+                }
+            }
         }
 
-        if rank_letter == 'X' {
-            rank = units::Ranks::Empty;
-        } else if rank_letter == 'P' {
-            rank = units::Ranks::Pawn;
-        } else if rank_letter == 'R' {
-            rank = units::Ranks::Rook;
-        } else if rank_letter == 'N' {
-            rank = units::Ranks::Knight;
-        } else if rank_letter == 'B' {
-            rank = units::Ranks::Bishop;
-        } else if rank_letter == 'Q' {
-            rank = units::Ranks::Queen;
-        } else if rank_letter == 'K' {
-            rank = units::Ranks::King;
-        } else {
-            rank = units::Ranks::Empty;
-        }
+        gen_moveset
+    }
 
-        units::Piece::piece_constructor(rank, color)
+    fn psuedo_vaild_move(&self, square: Square, x: isize, y: isize) -> (Vec<Action>, bool) {
+        let mut gen_moveset: Vec<Action> = vec![];
+        let mut collided: bool = false;
+        if not_out_of_bounds(x, y) {
+            let to_square = self.matrix[x as usize][y as usize];
+            if to_square.piece.is_none() {
+                let action = Action {
+                    from: square,
+                    to: to_square,
+                    action_type: ActionType::Regular,
+                };
+                gen_moveset.push(action);
+            } else if not_same_team(self.player, to_square) {
+                collided = true;
+                let action = Action {
+                    from: square,
+                    to: to_square,
+                    action_type: ActionType::Regular,
+                };
+                gen_moveset.push(action)
+            } else {
+                collided = true;
+            }
+        } else {
+            collided = true;
+        }
+        (gen_moveset, collided)
+    }
+
+    pub fn square_from_string(&self, letter_coordinate: &str) -> Result<Square, String> {
+        let coordinate = match Game::coordinate_from_string(letter_coordinate) {
+            Err(e) => return Err(e),
+            Ok(c) => c,
+        };
+        let square = Square {
+            coordinate: coordinate,
+            piece: self.matrix[coordinate.0 as usize][coordinate.1 as usize].piece,
+        };
+        Ok(square)
+    }
+
+    pub fn square_to_string(&self, square: Square) -> String {
+        let coordinate = square.coordinate;
+        Game::coordinate_to_string(coordinate)
+    }
+
+    pub fn coordinate_to_string(coordinate: (isize, isize)) -> String {
+        let row_letter: String = (coordinate.1 + 1).to_string();
+        let column_number = coordinate.0 + 1;
+        let column_letter = match column_number {
+            1 => "a",
+            2 => "b",
+            3 => "c",
+            4 => "d",
+            5 => "e",
+            6 => "f",
+            7 => "g",
+            8 => "h",
+            _ => panic!("there shouldnt be a out of bounds letter here"),
+        };
+
+        let string = String::from(column_letter) + &row_letter;
+        string
+    }
+    pub fn coordinate_from_string(letter_coordinate: &str) -> Result<(isize, isize), String> {
+        if letter_coordinate.len() != 2 {
+            return Result::Err(String::from("Coordinate wasnt in correct format"));
+        }
+        let column_letter = letter_coordinate
+            .chars()
+            .nth(0)
+            .unwrap()
+            .to_ascii_lowercase();
+        let row = letter_coordinate
+            .chars()
+            .nth(1)
+            .unwrap()
+            .to_digit(10)
+            .unwrap() as isize;
+
+        let column = match column_letter {
+            'a' => 0,
+            'b' => 1,
+            'c' => 2,
+            'd' => 3,
+            'e' => 4,
+            'f' => 5,
+            'g' => 6,
+            'h' => 7,
+            _ => return Result::Err(String::from("first letter doesnt correspond to a column")),
+        };
+
+        if row < 1 || row > 8 {
+            return Result::Err(String::from("Row index out of bounds"));
+        }
+        Ok((column, row - 1))
     }
 }
 
-mod game {
-    use super::board;
-    use super::actions;
-    use super::units;
-
-    struct Player{
-        killed: Vec<units::Piece>,
-    }
-
-    
-    pub struct Game {
-        board: board::Board,
-        players: [Player;2],
-    }
-
-    impl Game {
-        fn new() {}
-        fn replace(piece_move:actions::Move){
-
+fn not_same_team(team: Team, square: Square) -> bool {
+    if square.piece.is_some() {
+        if square.piece.unwrap().team != team {
+            return true;
         }
-        fn move_coordinate(&self,from:(i8,i8), to:(i8,i8)){
-            actions::move_coordinate(from, to,self.board);
-        }
+    }
+    return false;
+}
 
-        fn perform_action(&self,action:actions::Actions){
-            match action {
-                actions::Actions::Move => {
-                     replace()
-                },
-                _ => panic!("No such move"),
+fn is_starting_position(from_square: Square) -> bool {
+    match from_square.piece.unwrap().rank {
+        Rank::Pawn => match from_square.piece.unwrap().team {
+            Team::White => {
+                if from_square.coordinate.1 == 1 {
+                    return true;
+                } else {
+                    return false;
+                }
             }
+            Team::Black => {
+                if from_square.coordinate.1 == 6 {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        },
+        _ => panic!("havent implemented yet"),
+    }
+}
+
+pub fn not_out_of_bounds(x: isize, y: isize) -> bool {
+    if x < 0 || x > 7 || y < 0 || y > 7 {
+        return false;
+    } else {
+        return true;
+    }
+}
+fn next_player(team: Team) -> Team {
+    if team == Team::White {
+        return Team::Black;
+    } else {
+        return Team::White;
+    }
+}
+
+impl fmt::Display for Game {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut string_to_print = String::new();
+        string_to_print.push_str("A B C D E F G H \n");
+        for row in (0..8).rev() {
+            for column in 0..8 {
+                let square = self.matrix[column][row];
+                string_to_print.push_str(&String::from(format!("{} ", square)));
+            }
+            string_to_print.push_str(&String::from(format!(" {} \n", row + 1)));
         }
-        
+        write!(f, "{}", string_to_print)
+    }
+}
+#[derive(Debug, Copy, Clone)]
+pub struct Action {
+    from: Square,
+    to: Square,
+    action_type: ActionType,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum ActionType {
+    Regular,
+    Enpassant,
+    Promotion,
+    Castling,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct Square {
+    piece: Option<Piece>,
+    coordinate: (isize, isize),
+}
+
+impl fmt::Display for Square {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.piece {
+            None => write!(f, "."),
+            Some(p) => write!(f, "{}", p.unicode()),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum Team {
+    White,
+    Black,
+}
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum Rank {
+    Pawn,
+    Rook,
+    Knight,
+    Bishop,
+    Queen,
+    King,
+}
+
+#[derive(Debug, Copy, Clone)]
+struct Piece {
+    pub team: Team,
+    rank: Rank,
+}
+
+impl Piece {
+    pub fn unicode(&self) -> &str {
+        let team_index: usize = self.team_to_int() - 1;
+        match self.rank {
+            Rank::Pawn => ["♙", "♟︎"][team_index],
+            Rank::Rook => ["♖", "♜"][team_index],
+            Rank::Knight => ["♘", "♞"][team_index],
+            Rank::Bishop => ["♗", "♝"][team_index],
+            Rank::Queen => ["♕", "♛"][team_index],
+            Rank::King => ["♔", "♚"][team_index],
+        }
+    }
+    fn team_to_int(&self) -> usize {
+        match self.team {
+            Team::White => 1,
+            Team::Black => 2,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::board;
-    use super::actions;
-    use super::units;
-
+    use super::not_out_of_bounds;
+    use super::Game;
+    use super::Piece;
+    use super::Rank;
+    use super::Team;
     #[test]
     fn it_works() {
         assert_eq!(2 + 2, 4);
     }
+
     #[test]
-    fn test_config_file() {
-        let path = "board_config.txt";
-        let board = board::new(path);
-        let test_board_print: &str = &format!("{}", board);
-        println!("{}", test_board_print);
-        let correct_board_print=
-        "2 3 4 5 6 4 3 2 1 1 1 1 1 1 1 1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 1 1 1 1 1 1 1 2 3 4 5 6 4 3 2";
+    fn test_init() {
+        let game: Game = Game::new();
+        assert!("♔" == game.matrix[4][0].piece.unwrap().unicode());
+        assert!("♖" == game.matrix[0][0].piece.unwrap().unicode());
+    }
+
+    #[test]
+    fn test_out_of_bounds() {
+        assert!(not_out_of_bounds(-1, 1) == false);
+        assert!(not_out_of_bounds(0, 8) == false);
+        assert!(not_out_of_bounds(-1, -1) == false);
+        assert!(not_out_of_bounds(8, 0) == false);
+        assert!(not_out_of_bounds(1, 1) == true);
+        assert!(not_out_of_bounds(9, 0) == false);
+    }
+
+    #[test]
+    fn test_coordinate_from_string() {
+        println!("{:?}", Game::coordinate_from_string("a1").unwrap());
+        assert!(Game::coordinate_from_string("a1").unwrap() == (0, 0));
         assert_eq!(
-            correct_board_print.trim(),
-            test_board_print.trim().replace('\n', "")
+            Game::coordinate_from_string("z1"),
+            Err(String::from("first letter doesnt correspond to a column"))
         );
     }
 
     #[test]
-    fn test_pawn_movement() {
-        let path = "board_config.txt";
-        let board = board::new(path);
-        let moves = actions::psuedo_legal_moves((4,1), board);
-
-        assert!(moves[0] == (4, 2));
+    fn test_pawn_basic_move() {
+        let game = Game::new();
+        assert_eq!(2, game.move_from_string("a2").unwrap().len());
     }
     #[test]
-    fn test_bottom_color() {
-        let path = "board_config.txt";
-        let board = board::new(path);
-        assert!(board.matrix[0][0].piece.color == units::Color::White)
+    fn test_king_move() {
+        let mut game = Game::new();
+        let coordinate = Game::coordinate_from_string("e5").unwrap();
+        game.matrix[coordinate.0 as usize][coordinate.1 as usize].piece = Some(Piece {
+            rank: Rank::King,
+            team: Team::White,
+        });
+        println!(
+            "{:?}",
+            game.matrix[coordinate.0 as usize][coordinate.1 as usize]
+                .piece
+                .unwrap()
+        );
+        println!("{}", game);
+        println!("{:?}", game.move_from_string("e5"));
+        assert_eq!(2, game.move_from_string("e5").unwrap().len());
     }
-
-    #[test]
-    fn test_same_color_collision() {
-        let path = "board_config.txt";
-        let board = board::new(path);
-        let moves = actions::psuedo_legal_moves((3,0), board);
-
-        assert_eq!(moves.len(), 0);
-    }
-
-
-    
 }
