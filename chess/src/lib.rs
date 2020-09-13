@@ -190,9 +190,8 @@ impl Game {
             Team::White => 1,
             Team::Black => -1,
         };
-        let new_coordinate_x = x;
         let new_coordinate_y = y + offset;
-        let new_square = self.matrix[new_coordinate_x as usize][new_coordinate_y as usize];
+        let new_square = self.matrix[x as usize][new_coordinate_y as usize];
         if new_square.piece.is_none() {
             let action = Action {
                 from: start_square,
@@ -202,33 +201,7 @@ impl Game {
             available_moves.push(action);
         }
 
-        let new_coordinate_x = x + 1;
-        if not_out_of_bounds(new_coordinate_x, new_coordinate_y) {
-            let new_square = self.matrix[new_coordinate_x as usize][new_coordinate_y as usize];
-            if not_same_team(self.player, new_square) {
-                let action = Action {
-                    from: start_square,
-                    to: new_square,
-                    action_type: ActionType::Regular,
-                };
-                available_moves.push(action);
-            }
-        }
-
-        let new_coordinate_x = x - 1;
-        if not_out_of_bounds(new_coordinate_x, new_coordinate_y) {
-            let new_square = self.matrix[new_coordinate_x as usize][new_coordinate_y as usize];
-            if not_same_team(self.player, new_square) {
-                let action = Action {
-                    from: start_square,
-                    to: new_square,
-                    action_type: ActionType::Regular,
-                };
-                available_moves.push(action);
-            }
-        }
-
-        if is_starting_position(start_square) {
+        if self.unmoved(start_square) {
             let new_coordinate_y = y + 2 * offset;
             if not_out_of_bounds(x, new_coordinate_y) {
                 let new_square = self.matrix[x as usize][new_coordinate_y as usize];
@@ -242,7 +215,9 @@ impl Game {
                 }
             }
         }
-        //TODO fix enpassant, starting position
+
+        available_moves.append(&mut self.gen_pawn_attack_moveset(start_square));
+ 
 
         let mut prev_action: &Action;
 
@@ -322,6 +297,151 @@ impl Game {
         let gen_moveset: Vec<Action> =
             self.gen_generic_moveset(start_square, offsets, max_one, can_jump);
         gen_moveset
+    }
+
+    fn gen_pawn_attack_moveset(&self,from_square: Square) -> Vec<Action>{
+        let coordinate=from_square.coordinate;
+        let x=coordinate.0;
+        let y=coordinate.1;
+        let team_offset_y = match self.player {
+            Team::White => 1,
+            Team::Black => -1,
+        };
+        let mut gen_moveset:Vec<Action>=vec![];
+
+        let offsets=vec![(1,team_offset_y),(-1,team_offset_y)];
+        for offset in offsets{
+            if not_out_of_bounds(x+offset.0,y+offset.1){
+                let to_square=self.matrix[(x+offset.0)as usize][(y+offset.1) as usize];
+                if not_same_team(self.player, to_square){
+                    let action= Action{
+                        from:from_square,
+                        to:to_square,
+                        action_type: ActionType::Regular,
+                    };
+                    gen_moveset.push(action);
+
+                }
+            }
+        }
+        gen_moveset
+    }
+
+    fn castling(&self,start_square: Square) ->Vec<Action>{
+        let y=start_square.coordinate.1;
+        let x=start_square.coordinate.0;
+        let mut gen_moveset:Vec<Action>=vec![];
+        let mut squares_is_safe:bool=false;
+        let mut can_castle:bool=false;
+         //kingside castling
+        if self.unmoved(start_square){
+            if self.unmoved(self.matrix[7][y as usize]){
+                for dx in 1..3{
+                    if self.matrix[(x+dx)as usize][y as usize].piece.is_none(){
+                        can_castle=true;
+                    }
+                    else{
+                        can_castle=false;
+                    }
+                }
+                if can_castle{
+                    for dx in 1..3{
+                        if !self.check_square_attacked(self.matrix[(x+dx)as usize][y as usize]){
+                            squares_is_safe=true;
+                        }
+                        else{
+                            squares_is_safe=false;
+                        }
+                    }
+                }
+            }          
+        }
+        if squares_is_safe && can_castle{
+            let action=Action{
+                from:start_square,
+                to:self.matrix[7][y as usize],
+                action_type: ActionType::Castling,
+            };
+            gen_moveset.push(action);
+        }
+        squares_is_safe=false;
+        can_castle=false;
+
+        if self.unmoved(start_square){
+            if self.unmoved(self.matrix[0][y as usize]){
+  
+                for dx in 1..3{
+                    if self.matrix[(x-dx)as usize][y as usize].piece.is_none(){
+                        can_castle=true;
+                    }
+                    else{
+                        can_castle=false;
+                        
+                    }
+                }
+                if can_castle{
+                    println!("can castle");
+                    for dx in 1..3{
+                        if !self.check_square_attacked(self.matrix[(x-dx)as usize][y as usize]){
+                            squares_is_safe=true;
+                        }
+                        else{
+                            squares_is_safe=false;
+                        }
+                    }
+                }
+            }          
+        }
+        if squares_is_safe && can_castle{
+            let action=Action{
+                from:start_square,
+                to:self.matrix[0][y as usize],
+                action_type: ActionType::Castling,
+            };
+            gen_moveset.push(action);
+        }
+
+        gen_moveset
+    }
+
+    fn check_square_attacked(&self,square: Square) -> bool{
+        let mut is_attacked:bool=false;
+        for a in self.gen_moveset_bishop(square).iter(){
+            if a.to.piece.is_some(){
+                if a.to.piece.unwrap().rank==Rank::Bishop{
+                    is_attacked=true;
+                }
+            }
+        }
+        for a in self.gen_moveset_rook(square).iter(){
+            if a.to.piece.is_some(){
+                if a.to.piece.unwrap().rank==Rank::Rook{
+                    is_attacked=true;
+                }
+            }
+        }
+        for a in self.gen_moveset_queen(square).iter(){
+            if a.to.piece.is_some(){
+                if a.to.piece.unwrap().rank==Rank::Queen{
+                    is_attacked=true;
+                }
+            }
+        }
+        for a in self.gen_moveset_knight(square).iter(){
+            if a.to.piece.is_some(){
+                if a.to.piece.unwrap().rank==Rank::Knight{
+                    is_attacked=true;
+                }
+            }
+        }
+        for a in self.gen_pawn_attack_moveset(square).iter(){
+            if a.to.piece.is_some(){
+                if a.to.piece.unwrap().rank==Rank::Pawn{
+                    is_attacked=true;
+                }
+            }
+        }
+        is_attacked
     }
 
     fn gen_generic_moveset(
@@ -456,6 +576,43 @@ impl Game {
         }
         Ok((column, row - 1))
     }
+    pub fn unmoved(&self,from_square: Square) -> bool {
+        match from_square.piece.unwrap().rank {
+            Rank::Pawn => match from_square.piece.unwrap().team {
+                Team::White => {
+                    if from_square.coordinate.1 == 1 {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+                Team::Black => {
+                    if from_square.coordinate.1 == 6 {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            },
+            Rank::Rook => {
+                for action in self.history.iter(){
+                    if action.from.coordinate== from_square.coordinate{
+                        return false;
+                    }
+                }
+                return true;
+            }
+            _ => {
+                for action in self.history.iter(){
+                    if action.from.coordinate== from_square.coordinate{
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
+    }
+    
 }
 
 fn not_same_team(team: Team, square: Square) -> bool {
@@ -467,27 +624,7 @@ fn not_same_team(team: Team, square: Square) -> bool {
     return false;
 }
 
-fn is_starting_position(from_square: Square) -> bool {
-    match from_square.piece.unwrap().rank {
-        Rank::Pawn => match from_square.piece.unwrap().team {
-            Team::White => {
-                if from_square.coordinate.1 == 1 {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-            Team::Black => {
-                if from_square.coordinate.1 == 6 {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-        },
-        _ => panic!("havent implemented yet"),
-    }
-}
+
 
 pub fn not_out_of_bounds(x: isize, y: isize) -> bool {
     if x < 0 || x > 7 || y < 0 || y > 7 {
@@ -573,12 +710,12 @@ impl Piece {
     pub fn unicode(&self) -> &str {
         let team_index: usize = self.team_to_int() - 1;
         match self.rank {
-            Rank::Pawn => ["♙", "♟︎"][team_index],
-            Rank::Rook => ["♖", "♜"][team_index],
-            Rank::Knight => ["♘", "♞"][team_index],
-            Rank::Bishop => ["♗", "♝"][team_index],
-            Rank::Queen => ["♕", "♛"][team_index],
-            Rank::King => ["♔", "♚"][team_index],
+            Rank::Pawn => ["♟︎", "♙"][team_index],
+            Rank::Rook => ["♜", "♖"][team_index],
+            Rank::Knight => ["♞", "♘"][team_index],
+            Rank::Bishop => ["♝", "♗"][team_index],
+            Rank::Queen => ["♝", "♕"][team_index],
+            Rank::King => ["♚", "♔"][team_index],
         }
     }
     fn team_to_int(&self) -> usize {
@@ -604,8 +741,8 @@ mod tests {
     #[test]
     fn test_init() {
         let game: Game = Game::new();
-        assert!("♔" == game.matrix[4][0].piece.unwrap().unicode());
-        assert!("♖" == game.matrix[0][0].piece.unwrap().unicode());
+        assert!("♔" == game.matrix[4][7].piece.unwrap().unicode());
+        assert!("♖" == game.matrix[0][7].piece.unwrap().unicode());
     }
 
     #[test]
@@ -631,6 +768,7 @@ mod tests {
     #[test]
     fn test_pawn_basic_move() {
         let game = Game::new();
+ 
         assert_eq!(2, game.move_from_string("a2").unwrap().len());
     }
     #[test]
@@ -649,6 +787,24 @@ mod tests {
         );
         println!("{}", game);
         println!("{:?}", game.move_from_string("e5"));
-        assert_eq!(2, game.move_from_string("e5").unwrap().len());
+        assert_eq!(8, game.move_from_string("e5").unwrap().len());
+    }
+
+    #[test]
+    fn test_castling(){
+        let mut game = Game::new();
+        game.matrix[5][0].piece=None;
+        game.matrix[6][0].piece=None;
+        let moveset=game.castling(game.matrix[4][0]);
+        println!("{:?}",moveset);
+        assert_eq!(moveset.len(),1);
+        game.matrix[1][0].piece=None;
+        game.matrix[2][0].piece=None;
+        game.matrix[3][0].piece=None;
+        println!("");
+        println!("{:?}",moveset);
+        let moveset=game.castling(game.matrix[4][0]);
+        assert_eq!(moveset.len(),2);
+        
     }
 }

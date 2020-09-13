@@ -23,6 +23,10 @@ fn main() {
                 continue;
             }
         };
+        if moves.len()==0{
+            error_msg=String::from("there are no moves for this piece");
+            continue;
+        }
         println!("Choose move index: ");
         let input_index = io::stdin()
             .lock()
