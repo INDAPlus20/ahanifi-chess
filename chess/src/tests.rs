@@ -1,7 +1,8 @@
 #[cfg(test)]
 mod tests {
+    use super::*;
     use game::{Piece, Rank, Team};
-
+    use crate::pgn;
     use crate::game;
     use crate::{game::Game, moves};
 
@@ -40,7 +41,7 @@ mod tests {
     #[test]
     fn test_pawn_basic_move() {
         let mut game = Game::new();
-
+        //singlestep move and doublestep move
         assert_eq!(2, game.move_from_string("a2").unwrap().len());
     }
     #[test]
@@ -53,6 +54,19 @@ mod tests {
             team: Team::White,
         });
         assert_eq!(8, game.move_from_string("e4").unwrap().len());
+    }
+    #[test]
+    fn test_queen_move() {
+        let init_state = "RB NB BB QB KB BB NB RB
+                PB PB PB PB PB PB PB PB
+                XX XX XX XX XX XX XX XX
+                XX XX XX XX XX XX XX XX
+                XX XX XX PW XX XX XX XX
+                XX XX XX XX XX XX XX XX
+                PW PW XX XX XX PW PW PW
+                RW NW BW QW KW BW NW RW";
+        let mut game = Game::game_from_blockstate(init_state);
+        assert_eq!(3 + 2 + 4, game.move_from_string("d1").unwrap().len())
     }
 
     #[test]
@@ -88,19 +102,67 @@ mod tests {
 
     #[test]
     fn test_stalemate() {
-        let mut game = Game::new_empty();
-        game.black_king_square = game.matrix[0][7];
-        game.matrix[4][7].piece = None;
-        game.matrix[0][7].piece = Some(Piece {
-            rank: Rank::King,
-            team: Team::Black,
-        });
+        let init_state: &str = "KB XX XX XX XX XX XX XX
+         XX XX QW XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         XX XX XX XX KW XX XX XX";
+        let mut game = Game::game_from_blockstate(init_state);
         game.player = Team::Black;
-        game.matrix[2][6].piece = Some(Piece {
-            rank: Rank::Queen,
-            team: Team::White,
-        });
-        println!("{}", game);
-        // assert_eq!(game.is_more_moves(),false);
+        game.calculate_game_state();
+        assert_eq!(game::GameState::Stalemate, game.get_game_state());
+    }
+
+    #[test]
+    fn test_checkmate() {
+        let init_state: &str = "KB XX XX XX XX XX XX XX
+         XX XX QW XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         RW XX XX XX KW XX XX XX";
+        let mut game = Game::game_from_blockstate(init_state);
+        game.player = Team::Black;
+        game.calculate_game_state();
+        assert_eq!(game::GameState::Checkmate, game.get_game_state());
+    }
+
+    #[test]
+    fn test_check() {
+        let init_state: &str = "KB XX XX XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         XX XX XX XX XX XX XX XX
+         RW XX XX XX KW XX XX XX";
+        let mut game = Game::game_from_blockstate(init_state);
+        game.player = Team::Black;
+       
+        assert_eq!(game::GameState::Check, game.calculate_game_state());
+    }
+
+    #[test]
+    fn test_with_pgn(){
+           let pgn_filepaths=vec!["pgn_files/PGN1.txt","pgn_files/PGN2.txt","pgn_files/PGN3.txt","pgn_files/PGN4.txt","pgn_files/PGN5.txt","pgn_files/PGN6.txt"];
+           for filepath in pgn_filepaths {
+               compare_pgn_and_game(filepath)
+           }
+    }
+
+    fn compare_pgn_and_game(pgn_filepath:&str){
+        let mut game=game::Game::new();
+        let (actions,gamestates)=pgn::read_pgn(pgn_filepath);
+        for (i,action) in actions.iter().enumerate(){
+            game.perform_action(*action);
+            assert_eq!(game.get_game_state(),gamestates[i]);
+            
+        }
     }
 }

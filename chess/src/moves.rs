@@ -10,7 +10,7 @@ pub struct Action {
     pub action_type: ActionType,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ActionType {
     Regular,
     Enpassant,
@@ -136,7 +136,7 @@ pub fn gen_moveset_pawn(game: &game::Game, start_square: Square) -> Vec<Action> 
 
     if game::unmoved(game, start_square) {
         let new_coordinate_y = y + 2 * offset;
-        if game::not_out_of_bounds(x, new_coordinate_y) {
+        if game::not_out_of_bounds(x, new_coordinate_y) && game.matrix[x as usize][(y+offset) as usize].piece.is_none(){
             let new_square = game.matrix[x as usize][new_coordinate_y as usize];
             if new_square.piece.is_none() {
                 let action = Action {
@@ -214,7 +214,16 @@ pub fn gen_moveset_king(game: &game::Game, start_square: Square) -> Vec<Action> 
 pub fn gen_moveset_knight(game: &game::Game, start_square: Square) -> Vec<Action> {
     let max_one = true;
     let can_jump = true;
-    let offsets = vec![(-2, 1), (-1, 2), (1, 2), (2, 1), (2, -1), (1, -2), (-1, -2)];
+    let offsets = vec![
+        (-2, 1),
+        (-1, 2),
+        (1, 2),
+        (2, 1),
+        (2, -1),
+        (1, -2),
+        (-1, -2),
+        (-2, -1),
+    ];
     gen_generic_moveset(game, start_square, offsets, max_one, can_jump)
 }
 
@@ -273,69 +282,72 @@ pub fn castling(game: &game::Game, start_square: Square) -> Vec<Action> {
     let mut squares_is_safe: bool = false;
     let mut can_castle: bool = false;
     //kingside castling
-    if game::unmoved(game, start_square)
-        && game.matrix[7][y as usize].piece.is_some()
-        && game::unmoved(game, game.matrix[7][y as usize])
-    {
-        for dx in 1..3 {
-            if game.matrix[(x + dx) as usize][y as usize].piece.is_none() {
-                can_castle = true;
-            } else {
-                can_castle = false;
-            }
-        }
-        if can_castle {
+    if !game.check_square_attacked(start_square) {
+        if game::unmoved(game, start_square)
+            && game.matrix[7][y as usize].piece.is_some()
+            && game::unmoved(game, game.matrix[7][y as usize])
+        {
             for dx in 1..3 {
-                if !game.check_square_attacked(game.matrix[(x + dx) as usize][y as usize]) {
-                    squares_is_safe = true;
+                if game::not_out_of_bounds(x + dx, y)
+                    && game.matrix[(x + dx) as usize][y as usize].piece.is_none()
+                {
+                    can_castle = true;
                 } else {
-                    squares_is_safe = false;
+                    can_castle = false;
+                }
+            }
+            if can_castle {
+                for dx in 1..3 {
+                    if !game.check_square_attacked(game.matrix[(x + dx) as usize][y as usize]) {
+                        squares_is_safe = true;
+                    } else {
+                        squares_is_safe = false;
+                    }
                 }
             }
         }
-    }
-    if squares_is_safe && can_castle {
-        let action = Action {
-            from: start_square,
-            to: game.matrix[(x + 2) as usize][y as usize],
-            action_type: ActionType::Castling,
-        };
-        gen_moveset.push(action);
-    }
-    squares_is_safe = false;
-    can_castle = false;
+        if squares_is_safe && can_castle {
+            let action = Action {
+                from: start_square,
+                to: game.matrix[(x + 2) as usize][y as usize],
+                action_type: ActionType::Castling,
+            };
+            gen_moveset.push(action);
+        }
+        squares_is_safe = false;
+        can_castle = false;
 
-    if game::unmoved(game, start_square)
-        && game.matrix[0][y as usize].piece.is_some()
-        && game::unmoved(game, start_square)
-        && game.matrix[0][y as usize].piece.is_some()
-        && game::unmoved(game, game.matrix[0][y as usize])
-    {
-        for dx in 1..3 {
-            if game.matrix[(x - dx) as usize][y as usize].piece.is_none() {
-                can_castle = true;
-            } else {
-                can_castle = false;
-            }
-        }
-        if can_castle {
-            println!("can castle");
+        if game::unmoved(game, start_square)
+            && game.matrix[0][y as usize].piece.is_some()
+            && game::unmoved(game, game.matrix[0][y as usize])
+        {
             for dx in 1..3 {
-                if !game.check_square_attacked(game.matrix[(x - dx) as usize][y as usize]) {
-                    squares_is_safe = true;
+                if game::not_out_of_bounds(x - dx, y)
+                    && game.matrix[(x - dx) as usize][y as usize].piece.is_none()
+                {
+                    can_castle = true;
                 } else {
-                    squares_is_safe = false;
+                    can_castle = false;
+                }
+            }
+            if can_castle {
+                for dx in 1..3 {
+                    if !game.check_square_attacked(game.matrix[(x - dx) as usize][y as usize]) {
+                        squares_is_safe = true;
+                    } else {
+                        squares_is_safe = false;
+                    }
                 }
             }
         }
-    }
-    if squares_is_safe && can_castle {
-        let action = Action {
-            from: start_square,
-            to: game.matrix[(x - 2) as usize][y as usize],
-            action_type: ActionType::Castling,
-        };
-        gen_moveset.push(action);
+        if squares_is_safe && can_castle {
+            let action = Action {
+                from: start_square,
+                to: game.matrix[(x - 2) as usize][y as usize],
+                action_type: ActionType::Castling,
+            };
+            gen_moveset.push(action);
+        }
     }
 
     gen_moveset

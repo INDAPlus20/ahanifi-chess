@@ -1,142 +1,65 @@
+#[warn(dead_code)]
 use std::io::prelude::*;
 use std::{fmt, io};
 
 use crate::moves;
 use crate::moves::{Action, ActionType};
 
+#[derive(Debug, Clone)]
 pub struct Game {
+    gamestate: GameState,
     pub matrix: [[Square; 8]; 8],
     pub player: Team,
     pub history: Vec<Action>,
     pub white_king_square: Square,
     pub black_king_square: Square,
+    fifty_turn: i32,
 }
 
 impl Game {
     pub fn new() -> Game {
-        let init_state: Vec<&str> = ("RB NB BB KB QB BB NB RB
+        let init_state = "RB NB BB QB KB BB NB RB
                 PB PB PB PB PB PB PB PB
                 XX XX XX XX XX XX XX XX
                 XX XX XX XX XX XX XX XX
                 XX XX XX XX XX XX XX XX
                 XX XX XX XX XX XX XX XX
                 PW PW PW PW PW PW PW PW
-                RW NW BW KW QW BW NW RW")
-            .trim()
-            .split_whitespace()
-            .rev()
-            .collect();
+                RW NW BW QW KW BW NW RW";
 
-        let placeholder_square = Square {
-            //TODO fix array initialization
-            piece: None,
-            coordinate: (-1, -1),
-        };
-        let mut empty_matrix: [[Square; 8]; 8] = [[placeholder_square; 8]; 8];
-        let mut pieces: Vec<Option<Piece>> = vec![];
-
-        for block in init_state {
-            let piece = Game::block_to_piece(block);
-            pieces.push(piece);
-        }
-        let mut counter = 0;
-        for row in 0..8 {
-            for column in 0..8 {
-                let square: Square = Square {
-                    piece: pieces[counter as usize],
-                    coordinate: (column, row),
-                };
-
-                empty_matrix[column as usize][row as usize] = square;
-                counter += 1;
-            }
-        }
-        let white_king_square = empty_matrix[4][0];
-        let black_king_square = empty_matrix[4][7];
-        Game {
-            history: vec![],
-            player: Team::White,
-            matrix: empty_matrix,
-            white_king_square,
-            black_king_square,
-        }
+        Game::blockstate_to_board(init_state)
     }
     //for testing
-    pub fn new_empty() -> Game {
-        let init_state: Vec<&str> = ("XX XX XX KB XX XX XX XX
-                XX XX XX XX XX XX XX XX
-                XX XX XX XX XX XX XX XX
-                XX XX XX XX XX XX XX XX
-                XX XX XX XX XX XX XX XX
-                XX XX XX XX XX XX XX XX
-                XX XX XX XX XX XX XX XX
-                XX XX XX KW XX XX XX XX")
-            .trim()
-            .split_whitespace()
-            .rev()
-            .collect();
-
-        let placeholder_square = Square {
-            //TODO fix array initialization
-            piece: None,
-            coordinate: (-1, -1),
-        };
-        let mut empty_matrix: [[Square; 8]; 8] = [[placeholder_square; 8]; 8];
-        let mut pieces: Vec<Option<Piece>> = vec![];
-
-        for block in init_state {
-            let piece = Game::block_to_piece(block);
-            pieces.push(piece);
-        }
-        let mut counter = 0;
-        for row in 0..8 {
-            for column in 0..8 {
-                let square: Square = Square {
-                    piece: pieces[counter as usize],
-                    coordinate: (column, row),
-                };
-
-                empty_matrix[column as usize][row as usize] = square;
-                counter += 1;
-            }
-        }
-        let white_king_square = empty_matrix[4][0];
-        let black_king_square = empty_matrix[4][7];
-        Game {
-            history: vec![],
-            player: Team::White,
-            matrix: empty_matrix,
-            white_king_square,
-            black_king_square,
-        }
+    pub fn game_from_blockstate(blocks: &str) -> Game {
+        Game::blockstate_to_board(blocks)
+        
     }
 
     pub fn main(&mut self) {
         let mut error_msg = String::new();
         let mut turns_for_50 = 0;
-        let ended_state: Endedstate;
+
         loop {
             println!("{}", self);
             let king_square = match self.player {
                 Team::White => self.white_king_square,
                 Team::Black => self.black_king_square,
             };
-            if self.check_square_attacked(king_square) {}
 
             if !self.is_more_moves() {
                 if self.check_square_attacked(king_square) {
                     println!("Checkmate");
-                    ended_state = Endedstate::Checkmate;
+                    self.gamestate = GameState::Checkmate;
                     break;
                 } else {
                     println!("Stalemate");
-                    ended_state = Endedstate::Stalemate;
+                    self.gamestate = GameState::Stalemate;
                     break;
                 }
             } else if self.check_square_attacked(king_square) {
                 println!("Check")
             }
-
+            
             if !error_msg.is_empty() {
                 println!();
                 println!("{}", error_msg);
@@ -154,6 +77,7 @@ impl Game {
                 error_msg = String::from("there are no moves for this piece");
                 continue;
             }
+
             println!("Choose move index: ");
             let input_index = io::stdin()
                 .lock()
@@ -168,6 +92,7 @@ impl Game {
                 error_msg = String::from("Please choose a correct index");
                 continue;
             }
+
             self.perform_action(moves[input_index]);
 
             if self.history.last().unwrap().to.piece.is_some() {
@@ -181,19 +106,18 @@ impl Game {
             }
             if turns_for_50 / 2 == 100 {
                 println!("50-rule draw");
-                ended_state=Endedstate::FiftyRule;
+                self.gamestate = GameState::FiftyRule;
                 break;
             }
 
             error_msg = String::from("");
             print!("\x1B[2J\x1B[1;1H"); // Clears terminal screen
-
-            self.player = next_player(self.player)
+            println!("{:?}", moves[input_index]);
         }
-        println!("{:?}", ended_state);
+        println!("{:?}", self.gamestate);
     }
 
-    fn perform_action(&mut self, action: Action) {
+    pub fn perform_action(&mut self, action: Action) {
         self.history.push(action);
         let coordinate_from = action.from.coordinate;
         let coordinate_to = action.to.coordinate;
@@ -212,6 +136,8 @@ impl Game {
             }
             _ => self.make_move(&action),
         }
+        self.player = next_player(self.player);
+        self.calculate_game_state();
     }
 
     fn prompt_promotion() -> Rank {
@@ -246,45 +172,21 @@ impl Game {
         Ok(moveset)
     }
 
-    pub fn move_string(&mut self, letter_coordinate_from: &str, letter_coordinate_to: &str) {
-        let square = self.square_from_string(letter_coordinate_from).unwrap();
-        let coordinate_from = square.coordinate;
-        let moveset = moves::generate_moves(self, square).unwrap();
-        let coordinate_to = coordinate_from_string(letter_coordinate_to).unwrap();
-        if !moveset.is_empty() {
-            for action in moveset {
-                println!("{}", Game::square_to_string(&self, action.to));
-                if action.to.coordinate == coordinate_to {
-                    self.matrix[coordinate_to.0 as usize][coordinate_to.1 as usize].piece =
-                        square.piece;
-                    self.matrix[coordinate_from.0 as usize][coordinate_from.1 as usize].piece =
-                        None;
-                    self.history.push(action);
-                } else {
-                    println!("cant move there")
-                }
-            }
-        } else {
-            println!("no moves for this piece")
-        }
-    }
-
     pub fn check(&mut self, action: &Action) -> bool {
-        self.make_move(action);
+        let mut testing_game = self.clone();
+        testing_game.make_move(action);
         let king_square = match self.player {
-            Team::White => self.white_king_square,
-            Team::Black => self.black_king_square,
+            Team::White => testing_game.white_king_square,
+            Team::Black => testing_game.black_king_square,
         };
-        if self.check_square_attacked(king_square) {
-            self.undo_move(action);
+        if testing_game.check_square_attacked(king_square) {
             true
         } else {
-            self.undo_move(action);
             false
         }
     }
 
-    fn is_more_moves(&mut self) -> bool {
+    pub fn all_moves(&mut self) -> Vec<Action> {
         let mut all_moves: Vec<Action> = vec![];
         let matrix = self.matrix;
         for row in matrix.iter() {
@@ -295,6 +197,12 @@ impl Game {
                 }
             }
         }
+        all_moves
+    }
+
+    fn is_more_moves(&mut self) -> bool {
+        let all_moves: Vec<Action> = self.all_moves();
+
         !all_moves.is_empty()
     }
 
@@ -363,13 +271,25 @@ impl Game {
                         self.matrix[(coordinate_from.0 - 1) as usize][coordinate_from.1 as usize]
                             .piece = self.matrix[0][coordinate_from.1 as usize].piece;
                         self.matrix[0][coordinate_from.1 as usize].piece = None;
+                        if action.from.piece.unwrap().rank == Rank::King {
+                            match self.player {
+                                Team::White => {
+                                    self.white_king_square =
+                                        self.matrix[coordinate_to.0 as usize][coordinate_to.1 as usize]
+                                }
+                                Team::Black => {
+                                    self.black_king_square =
+                                        self.matrix[coordinate_to.0 as usize][coordinate_to.1 as usize]
+                                }
+                            }
+                        }
                     }
                     _ => panic!("cant castle to there"),
                 }
             } // already checking for check before adding move
         }
     }
-
+    //there is an error with bishop undo, 
     fn undo_move(&mut self, action: &Action) {
         let coordinate_from = action.from.coordinate;
         let coordinate_to = action.to.coordinate;
@@ -425,6 +345,8 @@ impl Game {
                     x if x > coordinate_from.0 => {
                         self.matrix[(coordinate_from.0 + 1) as usize][coordinate_from.1 as usize]
                             .piece = None;
+                        self.matrix[(coordinate_from.0 + 2) as usize][coordinate_from.1 as usize]
+                            .piece = None;
                         self.matrix[7][coordinate_from.1 as usize].piece = Some(Piece {
                             rank: Rank::Rook,
                             team: self.player,
@@ -432,6 +354,8 @@ impl Game {
                     }
                     x if x < coordinate_from.0 => {
                         self.matrix[(coordinate_from.0 - 1) as usize][coordinate_from.1 as usize]
+                            .piece = None;
+                        self.matrix[(coordinate_from.0 - 2) as usize][coordinate_from.1 as usize]
                             .piece = None;
                         self.matrix[0][coordinate_from.1 as usize].piece = Some(Piece {
                             rank: Rank::Rook,
@@ -451,31 +375,32 @@ impl Game {
     }
 
     pub fn check_square_attacked(&self, square: Square) -> bool {
-        let mut is_attacked: bool = false;
+        let is_attacked: bool = false;
 
         for a in moves::gen_moveset_bishop(self, square).iter() {
             if a.to.piece.is_some() && a.to.piece.unwrap().rank == Rank::Bishop {
-                is_attacked = true;
+               
+                return true;
             }
         }
         for a in moves::gen_moveset_rook(self, square).iter() {
             if a.to.piece.is_some() && a.to.piece.unwrap().rank == Rank::Rook {
-                is_attacked = true;
+                return true;
             }
         }
         for a in moves::gen_moveset_queen(self, square).iter() {
             if a.to.piece.is_some() && a.to.piece.unwrap().rank == Rank::Queen {
-                is_attacked = true;
+                return true;
             }
         }
         for a in moves::gen_moveset_knight(self, square).iter() {
             if a.to.piece.is_some() && a.to.piece.unwrap().rank == Rank::Knight {
-                is_attacked = true;
+                return true;
             }
         }
         for a in moves::gen_pawn_attack_moveset(self, square).iter() {
             if a.to.piece.is_some() && a.to.piece.unwrap().rank == Rank::Pawn {
-                is_attacked = true;
+                return true;
             }
         }
         is_attacked
@@ -508,6 +433,56 @@ impl Game {
         Some(piece)
     }
 
+    fn blockstate_to_board(blocks: &str) -> Game {
+        let placeholder_square = Square {
+            //TODO fix array initialization
+            piece: None,
+            coordinate: (-1, -1),
+        };
+
+        let mut matrix = [[placeholder_square; 8]; 8];
+
+        let blockstates: Vec<&str> = blocks.trim().split_whitespace().collect();
+        let mut pieces: Vec<Option<Piece>> = vec![];
+        for block in blockstates {
+            let piece = Game::block_to_piece(block);
+            pieces.push(piece);
+        }
+
+        let mut white_king_square: Square = placeholder_square;
+        let mut black_king_square: Square = placeholder_square;
+
+        for row in 0..8 {
+            for column in 0..8 {
+                let current_piece = pieces[8 * (7 - row) + column];
+                let this_square: Square = Square {
+                    piece: current_piece,
+                    coordinate: (column as isize, row as isize),
+                };
+                if current_piece.is_some() && current_piece.unwrap().rank == Rank::King {
+                    match current_piece.unwrap().team {
+                        Team::White => white_king_square = this_square,
+                        Team::Black => black_king_square = this_square,
+                    }
+                }
+                matrix[column][row] = this_square;
+            }
+        }
+        
+        let mut game=Game {
+            gamestate: GameState::Active,
+            history: vec![],
+            player: Team::White,
+            matrix,
+            black_king_square,
+            white_king_square,
+            fifty_turn: 0,
+        };
+        game.calculate_game_state();
+        game
+
+    }
+
     pub fn square_from_string(&self, letter_coordinate: &str) -> Result<Square, String> {
         let coordinate = match coordinate_from_string(letter_coordinate) {
             Err(e) => return Err(e),
@@ -524,6 +499,55 @@ impl Game {
         let coordinate = square.coordinate;
         coordinate_to_string(coordinate)
     }
+
+   pub fn calculate_game_state (&mut self) ->GameState{
+        let king_square = match self.player {
+            Team::White => self.white_king_square,
+            Team::Black => self.black_king_square,
+        };
+
+        let is_check=self.check_square_attacked(king_square);
+
+        if !self.is_more_moves() {
+            if is_check {
+                println!("Checkmate");
+                self.gamestate=GameState::Checkmate;
+                return GameState::Checkmate;
+            } else {
+                println!("Stalemate");
+                self.gamestate=GameState::Stalemate;
+                return GameState::Stalemate;
+            }
+        }
+        if is_check{
+            println!("Check");
+            self.gamestate=GameState::Check;
+            return GameState::Check;
+        }
+
+        if  !self.history.is_empty() &&self.history.last().unwrap().to.piece.is_some() {
+            self.fifty_turn = 0;
+        } else if  !self.history.is_empty()&&self.history.last().unwrap().from.piece.is_some() {
+            if self.history.last().unwrap().from.piece.unwrap().rank == Rank::Pawn {
+                self.fifty_turn = 0;
+            }
+        } else {
+            self.fifty_turn += 1;
+        }
+        if self.fifty_turn / 2 == 100 {
+            println!("50-rule draw");
+            self.gamestate=GameState::FiftyRule;
+            return GameState::FiftyRule;
+        }
+        self.gamestate=GameState::Active;
+        GameState::Active
+    }
+    
+    
+    pub fn get_game_state(&mut self) -> GameState {
+        self.gamestate
+    }
+        
 }
 
 impl fmt::Display for Game {
@@ -668,18 +692,15 @@ pub enum Rank {
     Queen,
     King,
 }
-#[derive(Debug, Copy, Clone)]
-pub enum Gamestate {
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum GameState {
     Active,
-    Ended,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum Endedstate {
+    Check,
     Checkmate,
     Stalemate,
     FiftyRule,
 }
+
 impl fmt::Display for Rank {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "{}", self)
