@@ -21,7 +21,8 @@
 Positions are given as strings with the format `"<file><rank>"`.
 
 ### Default board as blockstates
-```RB NB BB QB KB BB NB RB
+```
+RB NB BB QB KB BB NB RB
 PB PB PB PB PB PB PB PB
 XX XX XX XX XX XX XX XX
 XX XX XX XX XX XX XX XX
