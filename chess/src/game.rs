@@ -13,6 +13,7 @@ pub struct Game {
     pub history: Vec<Action>,
     pub white_king_square: Square,
     pub black_king_square: Square,
+    pub promotion_piece:Option<Rank>,
     fifty_turn: i32,
 }
 
@@ -117,6 +118,10 @@ impl Game {
         println!("{:?}", self.gamestate);
     }
 
+    pub fn set_promotion_piece(&mut self,piece:Rank){
+        self.promotion_piece=Some(piece);
+    }
+
     pub fn perform_action(&mut self, action: Action) {
         self.history.push(action);
         let coordinate_from = action.from.coordinate;
@@ -127,9 +132,10 @@ impl Game {
                 self.matrix[coordinate_from.0 as usize][coordinate_from.1 as usize].piece = None;
 
                 let promotion_piece = Piece {
-                    rank: Game::prompt_promotion(),
+                    rank: self.promotion_piece.unwrap(),
                     team: self.player,
                 };
+                self.promotion_piece=None;
                 self.matrix[coordinate_to.0 as usize][coordinate_to.1 as usize].piece =
                     Some(promotion_piece);
                 println!("Promotion")
@@ -477,6 +483,7 @@ impl Game {
             black_king_square,
             white_king_square,
             fifty_turn: 0,
+            promotion_piece:None,
         };
         game.calculate_game_state();
         game

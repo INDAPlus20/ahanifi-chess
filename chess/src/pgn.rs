@@ -203,10 +203,3 @@ fn file_to_half_turn(filepath: &str) -> Vec<String> {
     }
     half_turns
 }
-
-pub fn save_pgn(filepath: &str, actions:Vec<moves::Action>){
-    let mut string_to_push = String::new();
-    for (i,action) in actions.iter().enumerate(){
-        
-    }
-}
